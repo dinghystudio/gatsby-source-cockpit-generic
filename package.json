@@ -1,0 +1,25 @@
+{
+  "name": "gatsby-source-cockpit-generic",
+  "version": "1.0.0",
+  "description": "GatsbyJS source plugin for fetchting collections from a Cockpit CMS API.",
+  "author": "Daniel J. Becker",
+  "license": "UNLICENSED",
+  "keywords": [
+    "gatsby",
+    "cockpit",
+    "gatsby-plugin",
+    "gatsby-source-plugin"
+  ],
+  "main": "index.js",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/qoc/gatsby-source-cockpit-generic"
+  },
+  "scripts": {},
+  "devDependencies": {},
+  "dependencies": {
+    "gatsby-node-helpers": "^0.3.0",
+    "node-fetch": "^2.2.0"
+  }
+}

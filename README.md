@@ -15,12 +15,17 @@ module.exports = {
       resolve: 'gatsby-source-cockpit-generic',
       options: {
         host: `${process.env.COCKPIT_HOST}`,
-        accessToken: `${process.env.COCKPIT_ACCESS_TOKEN}`
+        accessToken: `${process.env.COCKPIT_ACCESS_TOKEN}`,
+        l10n: {
+          default: "en"
+        }
       }
     }
   ]
 }
 ```
+
+Add `l10n` and define a default language code that may be used to access field’s default values.
 
 Use environment variables to configure access to the Cockpit API:
 

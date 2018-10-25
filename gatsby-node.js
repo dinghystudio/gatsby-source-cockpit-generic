@@ -1,5 +1,6 @@
 
 const createNodeHelpers = require('gatsby-node-helpers').default
+const { createRemoteFileNode } = require('gatsby-source-filesystem')
 const { GraphQLBoolean, GraphQLList, GraphQLObjectType, GraphQLString } = require(`gatsby/graphql`)
 
 const Cockpit = require('./api')
@@ -36,6 +37,7 @@ const getFieldSpecification = (field) => {
     default: field.default || '',
     localize: field.localize,
     transform: noop,
+    file: false,
     link: false,
   }
 
@@ -66,6 +68,7 @@ const getFieldSpecification = (field) => {
       return specification
     case "image":
       specification.default = { path: '' }
+      specification.file = true
       specification.graphQLType = GraphQLObjectType
       return specification
     default:
@@ -97,7 +100,9 @@ const transformCockpitFields = (entry) => {
 }
 
 
-const createCollectionNodes = async ({ createNode, createParentChildLink }, cockpit, whitelist) => {
+const createCollectionNodes = async (args, cockpit, whitelist) => {
+  const { actions, cache, createNodeId, store } = args
+  const { createNode, createParentChildLink, touchNode } = actions
   const CollectionNode = createNodeFactory('Collection')
 
   let collections = whitelist
@@ -120,7 +125,8 @@ const createCollectionNodes = async ({ createNode, createParentChildLink }, cock
     entryFactory = createNodeFactory(`Collection${name}`)
 
     collectionEntries = await cockpit.collectionEntries(collection)
-    collectionEntries.entries.map(entry => {
+    for (let entry, i = 0; i < collectionEntries.entries.length; i++) {
+      entry = collectionEntries.entries[i]
       entry = transformCockpitFields(entry)
 
       let value, spec
@@ -136,22 +142,55 @@ const createCollectionNodes = async ({ createNode, createParentChildLink }, cock
           entry[`${key}___NODE`] = entry[key]
           delete entry[key]
         }
+        if (spec.file) {
+          let url = value.path
+          if (url) {
+            let fileNodeId
+
+            const mediaDataCacheKey = `cockpit-asset-${entry.id}`
+            const cacheMediaData = await cache.get(mediaDataCacheKey)
+            if (cacheMediaData && entry.modified.toISOString() === cacheMediaData.modified) {
+              fileNodeId = cacheMediaData.fileNodeId
+              touchNode({ nodeId: fileNodeId })
+            }
+
+            if (!fileNodeId) {
+              url = cockpit.getApiUrl(cockpit.host, url, cockpit.params)
+              const fileNode = await createRemoteFileNode({
+                url,
+                store,
+                cache,
+                createNode,
+                createNodeId,
+              })
+
+              fileNodeId = fileNode.id
+              await cache.set(mediaDataCacheKey, {
+                fileNodeId,
+                modified: entry.modified.toISOString(),
+              })
+            }
+
+            if (fileNodeId) entry[`${key}___NODE`] = fileNodeId
+          }
+        }
       }
 
       const entryNode = entryFactory(entry)
       createNode(entryNode)
 
       createParentChildLink({ parent: collectionNode, child: entryNode })
-    })
+    }
   }
 }
 
 
-exports.sourceNodes = async ({ actions }, configOptions) => {
+exports.sourceNodes = async (args, configOptions) => {
+  const { store } = args
   const { host, accessToken } = configOptions
   const cockpit = new Cockpit(host, accessToken)
 
-  await createCollectionNodes(actions, cockpit, configOptions.collections)
+  await createCollectionNodes(args, cockpit, configOptions.collections)
 }
 
 

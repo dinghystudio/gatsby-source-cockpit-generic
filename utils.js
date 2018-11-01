@@ -9,7 +9,17 @@ const trimSlashes = (original) => {
 const capitalize = input => `${input[0].toUpperCase()}${input.substr(1)}`
 
 
+const getSlug = node => `/${
+  node.internal.cockpitType
+}/${
+  node.internal.cockpitTypeName
+}/${
+  node.cockpitGenericId
+}`
+
+
 module.exports = {
   trimSlashes,
   capitalize,
+  getSlug,
 }

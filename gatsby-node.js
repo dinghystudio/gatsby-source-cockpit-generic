@@ -57,6 +57,7 @@ const getFieldSpecification = (field) => {
 
       return specification
     case "text":
+    case "textarea":
       specification.transform = str
       specification.default = ''
       specification.graphQLType = GraphQLString

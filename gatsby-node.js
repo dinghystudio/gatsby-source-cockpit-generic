@@ -45,7 +45,7 @@ const getFieldSpecification = (field) => {
   switch (field.type.toLowerCase()) {
     case "collectionlink":
       specification.transform = linkSingle
-      defaultValue = {}
+      defaultValue = null
 
       if (options.multiple) {
         specification.transform = linkMultiple

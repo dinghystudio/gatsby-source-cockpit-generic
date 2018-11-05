@@ -161,7 +161,7 @@ const createCollectionNodes = async (args, cockpit, configOptions) => {
       slug = (configOptions.getCollectionSlug || getSlug)(entry)
       entry = {
         ...entry,
-        slug: entry.slug || slug,
+        slug,
       }
 
       let spec, keys

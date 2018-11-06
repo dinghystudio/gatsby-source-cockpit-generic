@@ -123,6 +123,9 @@ const createCollectionNodes = async (args, cockpit, configOptions) => {
   let collections = configOptions.collections
   if (!collections) collections = await cockpit.listCollections()
 
+  let links = {}
+  let nodes = []
+
   let collection, collectionNode, collectionEntries, entryFactory
   let name, specifications, internalCockpit
   for (let key in collections) {
@@ -256,16 +259,37 @@ const createCollectionNodes = async (args, cockpit, configOptions) => {
             }
           }
           if (spec.link) {
+            if (!links[value]) links[value] = []
+            links[value].push([
+              `${name.toLowerCase()}_set`,
+              generateNodeId(`Collection${name}`, entry.id),
+            ])
+
             entry[`${current}___NODE`] = value
           }
         }
       }
 
       entry = entryFactory(entry)
-      createNode(entry)
-
-      createParentChildLink({ parent: collectionNode, child: entry })
+      nodes.push({ node: entry, parent: collectionNode })
     }
+  }
+
+  // create nodes and node reverse links
+  for (let node, parent, linked, key, j, i = 0; i < nodes.length; i++) {
+    ({ node, parent } = nodes[i])
+    if (Object.keys(links).includes(node.id)) {
+      linked = links[node.id]
+      for (j = 0; j < linked.length; j++) {
+        key = `${linked[j][0]}___NODE`
+
+        if (!node[key]) node[key] = []
+        node[key].push(linked[j][1])
+      }
+    }
+
+    createNode(node)
+    createParentChildLink({ parent, child: node })
   }
 }
 

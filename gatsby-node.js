@@ -130,8 +130,7 @@ const createCollectionNodes = async (args, cockpit, configOptions) => {
   for (let type, result, i = 0; i < apiTypes.length; i++) {
     type = apiTypes[i]
 
-    result = await getTypeEntries(args, configOptions, cockpit, type)
-
+    result = await buildCollectionEntries(args, configOptions, cockpit, type)
     nodes = nodes.concat(result[0])
     links = {
       ...links,
@@ -202,7 +201,7 @@ exports.setFieldsOnGraphQLNodeType = async ({ type }, configOptions) => {
   const cockpit = new Cockpit(host, accessToken)
 
   const entity = type.name.replace(TYPE_PREFIX, '')
-  if (entity.startsWith('Collection')) {
+  if (entity.startsWith('Collection') && entity !== 'Collections') {
     const collection = entity.replace('Collection', '').toLowerCase()
     // Only works on collections for now
     if (!collection) return {}
@@ -352,7 +351,7 @@ const buildEntry = async (args, configOptions, typeArgs) => {
 }
 
 
-const getTypeEntries = async (args, configOptions, cockpit, type) => {
+const buildCollectionEntries = async (args, configOptions, cockpit, type) => {
   let nodes = []
   let links = {}
 
@@ -364,17 +363,18 @@ const getTypeEntries = async (args, configOptions, cockpit, type) => {
   let current, parent, typeEntries, entryFactory
   let name, defaults, typeNodes, typeArgs
 
-  const TypeNode = createNodeFactory(capitalize(type))
+  const TypeNode = createNodeFactory(`${capitalize(type)}s`)
   for (let key in types) {
     typeNodes = []
     current = types[key]
 
     name = capitalize(current)
-    parent = TypeNode({
+    parent = {
       id: name,
       name,
-    })
-    createNode(parent)
+      type,
+      slug: current,
+    }
 
     currentSpecification = await cockpit[type](current)
     specifications = getFieldSpecifications(currentSpecification.fields)
@@ -430,6 +430,8 @@ const getTypeEntries = async (args, configOptions, cockpit, type) => {
           entry: typeEntries,
         },
       );
+      parent['content___NODE'] = _n.map(n => typeArgs.helper.getId(n.id))
+
       typeNodes = typeNodes.concat(_n)
       links = {
         ...links,
@@ -437,7 +439,9 @@ const getTypeEntries = async (args, configOptions, cockpit, type) => {
       }
     }
 
+    parent = TypeNode(parent)
     nodes = nodes.concat(typeNodes.map(n => ({ node: entryFactory(n), parent })))
+    createNode(parent)
   }
   return [nodes, links]
 }

@@ -37,6 +37,18 @@ class Cockpit {
   async collectionEntries(collection) {
     return await this.makeRequest(`/api/collections/get/${collection}`)
   }
+
+  async listSingletons() {
+    return await this.makeRequest('/api/singletons/listSingletons')
+  }
+
+  async singleton(singleton) {
+    return await this.makeRequest(`/api/singletons/singleton/${singleton}`)
+  }
+
+  async singletonEntries(singleton) {
+    return await this.makeRequest(`/api/singletons/get/${singleton}`)
+  }
 }
 
 

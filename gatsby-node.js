@@ -106,6 +106,7 @@ const transformCockpitFields = (entry) => {
   return entry
 }
 
+
 const RemarkNode = createNodeFactory('Remark', node => ({
   ...node,
   internal: {
@@ -125,50 +126,16 @@ const createCollectionNodes = async (args, cockpit, configOptions) => {
   let links = {}
   let nodes = []
 
-  let collection, parent, collectionEntries, entryFactory
-  let name, defaults
+  const apiTypes = ['collection', 'singleton']
+  for (let type, result, i = 0; i < apiTypes.length; i++) {
+    type = apiTypes[i]
 
-  const CollectionNode = createNodeFactory('Collection')
-  for (let key in collections) {
-    collection = collections[key]
+    result = await getTypeEntries(args, configOptions, cockpit, type)
 
-    name = capitalize(collection)
-    parent = CollectionNode({
-      id: name,
-      name,
-    })
-    createNode(parent)
-
-    collectionSpecification = await cockpit.collection(collection)
-    specifications = getFieldSpecifications(collectionSpecification.fields)
-
-    // we need to postpone entry node creation, but access internal fields
-    // before. So we mock the final object
-    entryFactory = createNodeFactory(`Collection${name}`)
-    defaults = {
-      internal: {
-        cockpitType: 'collection',
-        cockpitTypeName: `${name.toLowerCase()}`,
-      },
-    }
-
-    collectionEntries = await cockpit.collectionEntries(collection)
-    const [_n, _l] = await buildEntry(
-      args,
-      configOptions,
-      {
-        getUrl: url => cockpit.getApiUrl(cockpit.host, url, cockpit.params),
-        getId: id => generateNodeId(`Collection${name}`, id),
-      },
-      name,
-      specifications,
-      collectionEntries.entries,
-      defaults,
-    );
-    nodes = nodes.concat(_n.map(n => ({ node: entryFactory(n), parent })))
+    nodes = nodes.concat(result[0])
     links = {
       ...links,
-      ..._l,
+      ...result[1],
     }
   }
 
@@ -260,129 +227,217 @@ exports.setFieldsOnGraphQLNodeType = async ({ type }, configOptions) => {
   }
   return {}
 }
-async function buildEntry(args, configOptions, helper, name, specifications, entries, defaults = {}) {
+
+
+const buildEntry = async (args, configOptions, typeArgs) => {
 
   const { actions, cache, createNodeId, store } = args
   const { createNode, touchNode } = actions
   const { l10n, getCollectionSlug } = configOptions
+
+  const { helper, name, specifications, entry: original, defaults } = typeArgs
   const { getUrl, getId } = helper
 
   let links = {}
   let nodes = []
-  for (let entry, slug, i = 0; i < entries.length; i++) {
-    entry = entries[i];
-    entry = transformCockpitFields(entry);
-    entry = {
-      ...defaults,
-      ...entry,
-      internal: {
-        ...(entry.internal || {}),
-        ...(defaults.internal || {}),
-      },
-    };
-    slug = (getCollectionSlug || getSlugDefault)(entry);
-    entry = {
-      ...entry,
-      slug,
-    };
-    let spec, keys;
-    for (let key in specifications) {
-      spec = specifications[key] || {};
-      keys = { [key]: key };
-      if (spec.localize) {
-        for (let code, localKey, valueKey, j = 0; j < l10n.languages.length; j++) {
-          code = l10n.languages[j];
-          localKey = `${key}_${code}`;
-          valueKey = localKey;
-          if (code === l10n.default && Object.keys(entry).indexOf(localKey) === -1) {
-            valueKey = key;
-          }
-          keys = {
-            ...keys,
-            [localKey]: valueKey,
-          };
+
+  let entry = {
+    ...defaults,
+    ...original,
+    internal: {
+      ...(original.internal || {}),
+      ...(defaults.internal || {}),
+    },
+  };
+  entry = transformCockpitFields(entry)
+  const slug = (getCollectionSlug || getSlugDefault)(entry)
+  entry = {
+    ...entry,
+    slug,
+  }
+  let spec, keys
+  for (let key in specifications) {
+    spec = specifications[key] || {}
+    keys = { [key]: key }
+    if (spec.localize) {
+      for (let code, localKey, valueKey, i = 0; i < l10n.languages.length; i++) {
+        code = l10n.languages[i]
+        localKey = `${key}_${code}`
+        valueKey = localKey
+        if (code === l10n.default && Object.keys(entry).indexOf(localKey) === -1) {
+          valueKey = key
         }
-      }
-      let value, transformed = {};
-      for (let current in keys) {
-        if (Object.keys(transformed).indexOf(keys[current]) !== -1) {
-          value = transformed[keys[current]];
-        }
-        else {
-          value = entry[keys[current]];
-          if (value && spec.transform)
-            value = spec.transform(value);
-          if (!value)
-            value = spec.default;
-          transformed[keys[current]] = value;
-        }
-        entry[current] = value;
-        if (spec.remark) {
-          let remarkNodeId;
-          const mediaDataCacheKey = `cockpit-asset-${entry.id}-${keys[current]}`;
-          const cacheMediaData = await cache.get(mediaDataCacheKey);
-          if (cacheMediaData && entry.modified.toISOString() === cacheMediaData.modified) {
-            remarkNodeId = cacheMediaData.remarkNodeId;
-            touchNode({ nodeId: remarkNodeId });
-          }
-          if (!remarkNodeId) {
-            remarkNode = RemarkNode({
-              id: `${name}_${entry.id}_${current}`,
-              content: value,
-              slug,
-            });
-            createNode(remarkNode);
-            remarkNodeId = remarkNode.id;
-            await cache.set(mediaDataCacheKey, {
-              remarkNodeId,
-              modified: entry.modified.toISOString(),
-            });
-          }
-          if (remarkNodeId)
-            entry[`${current}___NODE`] = remarkNodeId;
-        }
-        if (spec.file) {
-          let url = value.path;
-          if (url) {
-            let fileNodeId;
-            const mediaDataCacheKey = `cockpit-asset-${entry.id}`;
-            const cacheMediaData = await cache.get(mediaDataCacheKey);
-            if (cacheMediaData && entry.modified.toISOString() === cacheMediaData.modified) {
-              fileNodeId = cacheMediaData.fileNodeId;
-              touchNode({ nodeId: fileNodeId });
-            }
-            if (!fileNodeId) {
-              url = getUrl(url);
-              const fileNode = await createRemoteFileNode({
-                url,
-                store,
-                cache,
-                createNode,
-                createNodeId,
-              });
-              fileNodeId = fileNode.id;
-              await cache.set(mediaDataCacheKey, {
-                fileNodeId,
-                modified: entry.modified.toISOString(),
-              });
-            }
-            if (fileNodeId)
-              entry[`${current}___NODE`] = fileNodeId;
-          }
-        }
-        if (spec.link) {
-          if (!links[value])
-            links[value] = [];
-          links[value].push([
-            `${name.toLowerCase()}_set`,
-            getId(entry.id),
-          ]);
-          entry[`${current}___NODE`] = value;
+        keys = {
+          ...keys,
+          [localKey]: valueKey,
         }
       }
     }
-    nodes.push(entry);
+    let value, transformed = {}
+    for (let current in keys) {
+      if (Object.keys(transformed).indexOf(keys[current]) !== -1) {
+        value = transformed[keys[current]]
+      }
+      else {
+        value = entry[keys[current]]
+        if (value && spec.transform) value = spec.transform(value)
+        if (!value) value = spec.default;
+        transformed[keys[current]] = value
+      }
+      entry[current] = value;
+      if (spec.remark) {
+        let remarkNodeId;
+        const mediaDataCacheKey = `cockpit-asset-${entry.id}-${keys[current]}`
+        const cacheMediaData = await cache.get(mediaDataCacheKey)
+        if (cacheMediaData && entry.modified.toISOString() === cacheMediaData.modified) {
+          remarkNodeId = cacheMediaData.remarkNodeId
+          touchNode({ nodeId: remarkNodeId })
+        }
+        if (!remarkNodeId) {
+          remarkNode = RemarkNode({
+            id: `${name}_${entry.id}_${current}`,
+            content: value,
+            slug,
+          })
+          createNode(remarkNode)
+          remarkNodeId = remarkNode.id
+          await cache.set(mediaDataCacheKey, {
+            remarkNodeId,
+            modified: entry.modified.toISOString(),
+          })
+        }
+        if (remarkNodeId) entry[`${current}___NODE`] = remarkNodeId
+      }
+      if (spec.file) {
+        let url = value.path
+        if (url) {
+          let fileNodeId
+          const mediaDataCacheKey = `cockpit-asset-${entry.id}`
+          const cacheMediaData = await cache.get(mediaDataCacheKey)
+          if (cacheMediaData && entry.modified.toISOString() === cacheMediaData.modified) {
+            fileNodeId = cacheMediaData.fileNodeId
+            touchNode({ nodeId: fileNodeId })
+          }
+          if (!fileNodeId) {
+            url = getUrl(url)
+            const fileNode = await createRemoteFileNode({
+              url,
+              store,
+              cache,
+              createNode,
+              createNodeId,
+            })
+            fileNodeId = fileNode.id
+            await cache.set(mediaDataCacheKey, {
+              fileNodeId,
+              modified: entry.modified.toISOString(),
+            })
+          }
+          if (fileNodeId) entry[`${current}___NODE`] = fileNodeId
+        }
+      }
+      if (spec.link) {
+        if (!links[value]) links[value] = []
+        links[value].push([
+          `${name.toLowerCase()}_set`,
+          getId(entry.id),
+        ])
+        entry[`${current}___NODE`] = value
+      }
+    }
   }
+  nodes.push(entry);
+
   return [nodes, links]
 }
 
+
+const getTypeEntries = async (args, configOptions, cockpit, type) => {
+  let nodes = []
+  let links = {}
+
+  const { createNode } = args.actions
+
+  let types = configOptions[`${type}s`]
+  if (!types) types = await cockpit[`list${capitalize(type)}s`]()
+
+  let current, parent, typeEntries, entryFactory
+  let name, defaults, typeNodes, typeArgs
+
+  const TypeNode = createNodeFactory(capitalize(type))
+  for (let key in types) {
+    typeNodes = []
+    current = types[key]
+
+    name = capitalize(current)
+    parent = TypeNode({
+      id: name,
+      name,
+    })
+    createNode(parent)
+
+    currentSpecification = await cockpit[type](current)
+    specifications = getFieldSpecifications(currentSpecification.fields)
+
+    // we need to postpone entry node creation, but access internal fields
+    // before. So we mock the final object
+    entryFactory = createNodeFactory(`${capitalize(type)}${name}`)
+    const { _id, _created, _modified } = currentSpecification
+    defaults = {
+      _id,
+      _created,
+      _modified,
+      internal: {
+        type,
+        cockpitType: type,
+        cockpitTypeName: `${name.toLowerCase()}`,
+      },
+    }
+
+    typeArgs = {
+      helper: {
+        getUrl: url => cockpit.getApiUrl(cockpit.host, url, cockpit.params),
+        getId: id => generateNodeId(`${capitalize(type)}${name}`, id),
+      },
+      name,
+      specifications,
+      defaults,
+    }
+    typeEntries = await cockpit[`${type}Entries`](current)
+    if (typeEntries.entries) {
+      for (let i = 0; i < typeEntries.entries.length; i++) {
+
+        const [_n, _l] = await buildEntry(
+          args,
+          configOptions,
+          {
+            ...typeArgs,
+            entry: typeEntries.entries[i],
+          },
+        );
+        typeNodes = typeNodes.concat(_n)
+        links = {
+          ...links,
+          ..._l,
+        }
+      }
+    } else {
+      const [_n, _l] = await buildEntry(
+        args,
+        configOptions,
+        {
+          ...typeArgs,
+          entry: typeEntries,
+        },
+      );
+      typeNodes = typeNodes.concat(_n)
+      links = {
+        ...links,
+        ..._l,
+      }
+    }
+
+    nodes = nodes.concat(typeNodes.map(n => ({ node: entryFactory(n), parent })))
+  }
+  return [nodes, links]
+}

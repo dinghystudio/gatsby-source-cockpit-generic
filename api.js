@@ -16,14 +16,19 @@ class Cockpit {
     this.params = querystring.stringify({ token, })
   }
 
-  getApiUrl(host, path, params = '') {
-    return `${trimSlashes(host.trim())}/${trimSlashes(path.trim())}?${params}`
+  getApiUrl(path) {
+    return `${trimSlashes(this.host.trim())}/${trimSlashes(path.trim())}?${this.params}`
   }
 
   async makeRequest(path) {
-    const url = this.getApiUrl(this.host, path, this.params)
+    const url = this.getApiUrl(path)
     const response = await fetch(url, { method: 'get', headers: this.headers })
     return await response.json()
+  }
+
+  async assets() {
+    const { assets: entries } = await this.makeRequest('/api/cockpit/assets')
+    return { entries }
   }
 
   async listCollections() {
@@ -47,7 +52,10 @@ class Cockpit {
   }
 
   async singletonEntries(singleton) {
-    return await this.makeRequest(`/api/singletons/get/${singleton}`)
+    return await {
+      ...(await this.singleton(singleton)),
+      entries: [await this.makeRequest(`/api/singletons/get/${singleton}`)],
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "gatsby-source-cockpit-generic",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "GatsbyJS source plugin for fetchting collections from a Cockpit CMS API.",
   "author": "Daniel J. Becker",
   "license": "UNLICENSED",

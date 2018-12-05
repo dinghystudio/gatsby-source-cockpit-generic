@@ -8,6 +8,7 @@ const getContentHelpers = (args, config) => {
 
   const AssetNode = createNodeFactory('content Asset')
   const PlainNode = createNodeFactory('content Plain')
+  const CollectionLinkNode = createNodeFactory('content Collection Link')
   const RemarkNode = createNodeFactory('content Remark', node => ({
     ...node,
     internal: {
@@ -30,16 +31,28 @@ const getContentHelpers = (args, config) => {
         })
         if (!id) break
 
-        node = AssetNode({ label, id: value.id, content___NODE: id }, { parent })
+        const { name, title, description: content } = value
+        node = AssetNode(
+          { label, id: value.id, asset___NODE: id, name, title, content },
+          { parent },
+        )
         break
 
       case 'markdown':
         node = RemarkNode({ label, ...value }, { parent })
         break
 
-      default:
+      case 'collectionlink':
+        node = CollectionLinkNode({ label, ...value }, { parent })
+        break
+
+      case 'text':
         node = PlainNode({ label, ...value }, { parent })
         break
+
+      default:
+        console.warn('Could not find Node for type', type)
+        return
     }
     return node
   }
@@ -98,15 +111,35 @@ const getContentHelpers = (args, config) => {
     let field = sourceField
 
     const processValue = (suffix, parent, id, index, item, assetMap={}) => {
-      const { type, label } = item.field
+      const { type, label, name } = item.field
 
-      if (type === 'asset') return getValueNode(parent, type, label, {
-        id: `${id}_${index}_${label}${suffix}`,
-        ...item.value,
-      }, assetMap)
+      if (type === 'asset') {
+        return getValueNode(parent, type, label, {
+          id: `${id}_${index}_${label}${suffix}`,
+          name,
+          ...item.value,
+        }, assetMap)
+      } else if (type === 'collectionlink') {
+        const { display: content, multiple } = item.field.options
+
+        let values = item.value
+        if (!multiple) values = [values]
+        values = values.map(value => generateNodeId(
+          `collection ${value.link}`,
+          `${value._id}${suffix}`
+        ))
+
+        return getValueNode(parent, type, label, {
+          id: `${id}_${index}_${label}${suffix}`,
+          name,
+          content,
+          links___NODE: values,
+        }, assetMap)
+      }
 
       return getValueNode(parent, type, label, {
         id: `${id}_${index}_${label}${suffix}`,
+        name,
         content: item.value,
       }, assetMap)
     }
@@ -172,7 +205,7 @@ const getContentHelpers = (args, config) => {
           i,
           v,
           assetMap,
-        ))
+        )).filter(n => n)
         processedValue = nodes.map(n => n.id)
         break
 

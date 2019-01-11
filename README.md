@@ -3,9 +3,6 @@
 
 GatsbyJS source plugin for fetchting collections and singletons from a [Cockpit CMS API](https://getcockpit.com/documentation/api).
 
-*Yet another Cockpit Source Plugin!? Why?*
-At the time of writing, plenty other plugins were heavily in development, not officially working with GatsbyJS v2, did not handle i18n, repeater fields or put emphasis on things we didn’t need in a source plugin (layout fields).
-
 
 ## Current Featureset #
 
@@ -45,11 +42,7 @@ module.exports = {
 }
 ```
 
-Add `l10n` and define a default language code that may be used to access field’s default values. Additionally the plugin will create an entry `alternates` containing IDs to the node in all available languages, e.g.:
-
-```
-
-```
+Add `l10n` and define a default language code that may be used to access field’s default values. Additionally the plugin will create an entry `alternates` with relations to the node in all available languages.
 
 
 ### Fetching contents #
@@ -78,11 +71,20 @@ Issues and pull requests welcome!
 ## Todos #
 
 * Test
-* Implement extensive node caching and cache invalidation
+* Add full example
+* Implement node caching and cache invalidation
 * Enhance console output using Gatsby’s `reporter`
 * White- and blacklisting of Collections and Singletons. Could either be
   * naive: simply ignore a list of blacklisted Collections/Singletons or only fetch whitelisted contents.
   * smarter: considering relations between Collections
+
+
+## Reasoning #
+
+Why **yet another Cockpit Source Plugin?**
+
+At the time of writing, plenty other plugins were available but heavily in development, not officially working with GatsbyJS v2, did not handle i18n, repeater fields or put emphasis on things we didn’t need in a source plugin (layout fields).
+The features needed in our project were straight forward and writing a custom plugin seemed easy enough. Also the featureset grew with our needs.
 
 
 ## Previous work #
@@ -90,6 +92,7 @@ Issues and pull requests welcome!
 * [Ginetta Cockpit Source Plugin](https://github.com/ginetta/ginetta-gatsby-source-plugin/)
 * [@fika/Gatsby-Source-Cockpit](https://github.com/fikaproductions/fika-gatsby-source-cockpit) as featured in the official GatsbyJS docs
 * [Gatsby-Source-Cockpit](https://github.com/mpartipilo/gatsby-source-cockpit) by @mpartipilo
+
 
 ## Thanks #
 

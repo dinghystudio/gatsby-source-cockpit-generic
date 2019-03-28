@@ -43,25 +43,44 @@ exports.sourceNodes = async (args, options) => {
   const { getContentTypeNode, getFieldSpecification } = helpers
 
   const { actions, cache, createNodeId, store } = args
-  const { createNode } = actions
+  const { createNode, touchNode } = actions
 
 
   let links = {}, nodes = [], assetMap = {}
 
   // fetch assets and create remote file nodes
   const { entries: assets } = await cockpit.assets()
-  for (let asset, url, file, a = 0; a < assets.length; a++) {
+  for (let asset, cacheKey, cacheData, modified, url, file, a = 0; a < assets.length; a++) {
+    let nodeId = undefined
     asset = assets[a]
-    url = cockpit.getApiUrl(`${trim(uploadPath, '/')}/${trim(asset.path, '/')}`)
 
-    file = await createRemoteFileNode({
-      url,
-      store,
-      cache,
-      createNode,
-      createNodeId,
-    })
-    assetMap[asset.path] = file.id
+    cacheKey = `${config.typePrefix}-Asset-${asset._id}`
+    cacheData = await cache.get(cacheKey)
+    modified = asset.modified
+
+    if (cacheData && modified === cacheData.modified) {
+      nodeId = cacheData.nodeId
+      touchNode({ nodeId })
+    }
+
+    if (!nodeId) {
+      url = cockpit.getApiUrl(`${trim(uploadPath, '/')}/${trim(asset.path, '/')}`)
+
+      file = await createRemoteFileNode({
+        url,
+        store,
+        cache,
+        createNode,
+        createNodeId,
+      })
+      nodeId = file.id
+
+      await cache.set(cacheKey, {
+        nodeId,
+        modified,
+      })
+    }
+    assetMap[asset.path] = nodeId
   }
 
   // process content types
@@ -114,17 +133,21 @@ exports.sourceNodes = async (args, options) => {
           ...entry,
         }
 
-        // create node, process fields for all languages specified in config
-        let alternates = []
+        // wrapper to process an entry into nodes and compile links and language
+        // alternatives. Including cache handling to only process changed and new entries
+        const getNodesFromEntry = async (id, entry, l10n, nodes, links, alternates) => {
+          const cacheKey = `${config.typePrefix}_${entry.meta.type}_${id}`
+          const cacheData = await cache.get(cacheKey)
+          const modified = entry._modified
 
-        if (l10n.languages && l10n.languages.length) {
-          // process nodes for all languages
-          for (let language, processed, l = 0; l < l10n.languages.length; l++) {
-            language = l10n.languages[l]
+          if (cacheData && modified === cacheData.modified) {
+            cachedNodes = cacheData.nodes
+            cachedNodes.map(nodeId => touchNode({ nodeId }))
+          } else {
             processed = processEntry(
               Node,
               parent,
-              { language, isDefault: language === l10n.default },
+              l10n,
               spec,
               entry,
               assetMap,
@@ -142,30 +165,50 @@ exports.sourceNodes = async (args, options) => {
 
             // keep track of identical nodes in different languages
             alternates = [].concat(alternates, [processed.node])
+
+            await cache.set(cacheKey, {
+              modified,
+              nodes: [processed.node.id].concat(processed.nodes.map(n => n.id)),
+            })
+          }
+
+          return { nodes, links, alternates }
+        }
+
+        // create node, process fields for all languages specified in config
+        let alternates = []
+        if (l10n.languages && l10n.languages.length) {
+          // process nodes for all languages
+          for (let language, nodeId, l = 0; l < l10n.languages.length; l++) {
+            language = l10n.languages[l]
+            nodeId = `${entry.meta.id}-${language}`
+            const processedNodes = await getNodesFromEntry(
+              nodeId,
+              entry,
+              { language, isDefault: language === l10n.default },
+              nodes,
+              links,
+              alternates,
+            )
+
+            nodes = processedNodes.nodes
+            links = processedNodes.links
+            alternates = processedNodes.alternates
           }
         } else {
-          // no localization configured
-          processed = processEntry(
-            Node,
-            parent,
-            {},
-            spec,
+          nodeId = `${entry.meta.id}`
+          const processedNodes = await getNodesFromEntry(
+            nodeId,
             entry,
-            assetMap,
-            helpers,
+            {},
+            nodes,
+            links,
+            alternates,
           )
 
-          nodes = [].concat(nodes, processed.nodes)
-          parent.children.push(processed.node.id)
-
-          // create a list of ids used for reverse relations later on
-          links = processed.links.reduce((acc, v) => ({
-            ...acc,
-            [v]: [].concat(acc[v] || [], [{ type, id: processed.node.id}]),
-          }), links)
-
-          // keep track of identical nodes in different languages
-          alternates = [].concat(alternates, [processed.node])
+          nodes = processedNodes.nodes
+          links = processedNodes.links
+          alternates = processedNodes.alternates
         }
 
         // link localized nodes to one another
@@ -180,7 +223,7 @@ exports.sourceNodes = async (args, options) => {
   }
 
   // process, create nodes and relation links
-  for (let node, nodeLinks, r, i = 0; i < nodes.length; i++) {
+  for (let node, nodeLinks, i = 0; i < nodes.length; i++) {
     node = nodes[i]
 
     // process reverse relations

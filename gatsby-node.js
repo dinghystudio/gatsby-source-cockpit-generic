@@ -14,7 +14,21 @@ const CONFIG_DEFAULTS = {
   contents: [
     { type: 'collection', whitelist: [], blacklist: [] },
     { type: 'singleton', whitelist: [], blacklist: [] },
-    { type: 'asset', whitelist: [], blacklist: [] },
+    {
+      type: 'asset',
+      filetypes: {
+        image: true,
+        video: true,
+        audio: true,
+        archive: true,
+        document: true,
+        code: true,
+      },
+      tags: {
+        whitelist: [],
+        blacklist: [],
+      },
+    },
   ],
 }
 
@@ -42,54 +56,20 @@ exports.sourceNodes = async (args, options) => {
   const helpers = getContentHelpers(args, config)
   const { getContentTypeNode, getFieldSpecification } = helpers
 
-  const { actions, cache, createNodeId, store } = args
+  const { actions, cache } = args
   const { createNode, touchNode } = actions
 
-
   let links = {}, nodes = [], assetMap = {}
-
-  // fetch assets and create remote file nodes
-  const { entries: assets } = await cockpit.assets()
-  for (let asset, cacheKey, cacheData, modified, url, file, a = 0; a < assets.length; a++) {
-    let nodeId = undefined
-    asset = assets[a]
-
-    cacheKey = `${config.typePrefix}-Asset-${asset._id}`
-    cacheData = await cache.get(cacheKey)
-    modified = asset.modified
-
-    if (cacheData && modified === cacheData.modified) {
-      nodeId = cacheData.nodeId
-      touchNode({ nodeId })
-    }
-
-    if (!nodeId) {
-      url = cockpit.getApiUrl(`${trim(uploadPath, '/')}/${trim(asset.path, '/')}`)
-
-      file = await createRemoteFileNode({
-        url,
-        store,
-        cache,
-        createNode,
-        createNodeId,
-      })
-      nodeId = file.id
-
-      await cache.set(cacheKey, {
-        nodeId,
-        modified,
-      })
-    }
-    assetMap[asset.path] = nodeId
-  }
+  assetMap = await fetchAssets(config, assetMap, cockpit, args)
 
   // process content types
-  for (let contentType, TypeNode, types, ct = 0; ct < contentTypes.length; ct++) {
+  for (let contentType, TypeNode, types, typeConfig, ct = 0; ct < contentTypes.length; ct++) {
     ({ type: contentType, multiple } = contentTypes[ct])
+
+    typeConfig = config.contents.find(({ type }) => type === contentType)
+    types = await listContentType(cockpit, contentType, typeConfig.whitelist, typeConfig.blacklist)
+
     TypeNode = getContentTypeNode(`${contentType}s`)
-
-    types = await listContentType(cockpit, contentType)
-
     for (let type, spec, content, parent, Node, t = 0; t < types.length; t++) {
       type = types[t]
 
@@ -265,6 +245,56 @@ const loadContentTypeEntries = (cockpit, type, item) => {
 }
 
 
+const fetchAssets = async (config, assetMap, cockpit, args) => {
+  const { actions, cache, createNodeId, store } = args
+  const { createNode, touchNode } = actions
+
+  const assetConfig = config.contents.find(({ type }) => type === 'asset')
+  if (!assetConfig) return assetMap
+
+  const { uploadPath } = config
+  const { filetypes, tags } = assetConfig
+
+  // fetch assets and create remote file nodes
+  const { entries: assets } = await cockpit.assets()
+  for (let asset, cacheKey, cacheData, modified, url, file, a = 0; a < assets.length; a++) {
+    let nodeId = undefined
+    asset = assets[a]
+
+    if (!isAssetDownloadEligible(asset, filetypes, tags)) continue
+
+    cacheKey = `${config.typePrefix}-Asset-${asset._id}`
+    cacheData = await cache.get(cacheKey)
+    modified = asset.modified
+
+    if (cacheData && modified === cacheData.modified) {
+      nodeId = cacheData.nodeId
+      touchNode({ nodeId })
+    }
+
+    if (!nodeId) {
+      url = cockpit.getApiUrl(`${trim(uploadPath, '/')}/${trim(asset.path, '/')}`)
+
+      file = await createRemoteFileNode({
+        url,
+        store,
+        cache,
+        createNode,
+        createNodeId,
+      })
+      nodeId = file.id
+
+      await cache.set(cacheKey, {
+        nodeId,
+        modified,
+      })
+    }
+    assetMap[asset.path] = nodeId
+  }
+
+  return assetMap
+}
+
 
 const processEntry = (TypeNode, parent, l10n, specifications, entry, assetMap, helpers) => {
   const { processFieldValue } = helpers
@@ -302,4 +332,27 @@ const processEntry = (TypeNode, parent, l10n, specifications, entry, assetMap, h
   }
 
   return { node, nodes, links }
+}
+
+
+const isAssetDownloadEligible = (asset, filetypes, tags) => {
+  const suitableFiletype = Object.entries(filetypes).map(
+    ([key, value]) => (value === true && asset[key] === true)
+  ).includes(true)
+  if (!suitableFiletype) return false
+
+  const { whitelist, blacklist } = tags
+  if (whitelist.length) {
+    if (asset.tags.length === 0) return false
+    for (let i = 0; i < asset.tags.length; i++) {
+      if (whitelist.includes(asset.tags[i])) return true
+    }
+    return false
+  }
+  if (blacklist.length) {
+    for (let i = 0; i < asset.tags.length; i++) {
+      if (blacklist.includes(asset.tags[i])) return false
+    }
+  }
+  return true
 }

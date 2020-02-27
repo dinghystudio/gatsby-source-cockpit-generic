@@ -73,6 +73,9 @@ exports.createPages = ({ graphql, actions }) => {
       edges {
         node {
           slug
+          meta {
+            id
+          }
         }
       }
     }
@@ -160,6 +163,24 @@ function slugify(text) {
 The slug field can then be used in page creation:
 
 ```diff
+    const query = `
+    {
+      allCockpitGenericCollectionEntries {
+        edges {
+          node {
+-           slug
++           fields {
++             slug
++           }
+            meta {
+              id
+            }
+          }
+        }
+      }
+    }
+    `
+    // …
     result.data.allCockpitGenericCollectionEntries.edges.forEach(
       ({ node }) => {
 -       const { slug, meta: { id } } = node

@@ -34,11 +34,11 @@ module.exports = {
         host: `${process.env.COCKPIT_HOST}`,
         accessToken: `${process.env.COCKPIT_ACCESS_TOKEN}`,
         l10n: {
-          default: "en"
-        }
-      }
-    }
-  ]
+          default: "en",
+        },
+      },
+    },
+  ],
 }
 ```
 
@@ -198,6 +198,137 @@ The slug field can then be used in page creation:
 
 
 ### Internationalization #
+
+If Cockpit is configured for multiple languages, alternates can be created by updating configuration and sourcing like this:
+
+```diff
+// gatsby-config.js
+module.exports = {
+  plugins: [
+    {
+      resolve: 'gatsby-source-cockpit-generic',
+      options: {
+        host: `${process.env.COCKPIT_HOST}`,
+        accessToken: `${process.env.COCKPIT_ACCESS_TOKEN}`,
+        l10n: {
+          default: "en",
++         languages: ['de', 'en'],
+        },
+      },
+    },
+  ],
+}
+```
+
+```diff
+// gatsby-node.js
++ const { assign, isObject } = require('lodash')
++
++ const PATH_LOCALIZATIONS = {
++   exceptions: ['/404/', '/404.html', '/dev-404-page/'],
++ }
++
++ function getLanguageConfig(config) {
++   // return the l10n configuration from gatsby-source-cockpit-generic
++   const {
++     options: { l10n },
++   } = config.plugins.find(
++     p => isObject(p) && p.resolve === 'gatsby-source-cockpit-generic'
++   )
++   return l10n
++ }
+
+// …
+
+    result.data.allCockpitGenericCollectionArtworks.edges.forEach(
+      ({ node }) => {
+-       const { fields: { slug }, meta: { id } } = node
++       const { language, fields: { slug }, meta: { id } } = node
+
+        createPage({
+          path: slug,
+          component,
+          context: {
+            id,
++           language,
+          },
+        })
+      }
+    )
+
+// …
+
++ exports.onCreatePage = ({ page, actions, store }) => {
++   // for every page that is not yet localized, remove existing path, create
++   // new path and page for every language specified in config
++   const { exceptions } = PATH_LOCALIZATIONS
++   if (exceptions.includes(page.path)) return
++
++   const { config } = store.getState()
++   const l10n = getLanguageConfig(config)
++
++   console.log('l10n', l10n)
++   if (l10n && l10n.languages) {
++     const { createPage, deletePage } = actions
++     const { languages, default: defaultLanguage } = l10n
++
++     deletePage(page)
++
++     let updatedPage, localePath
++     languages.forEach(language => {
++       localePath = language === defaultLanguage && page.path === '/'
++         ? page.path
++         : `/${language}${page.path}`
++
++       updatedPage = assign({}, page, {
++         path: localePath,
++         context: { language },
++       })
++
++       createPage(updatedPage)
++     })
++   }
++ }
+```
+
+Afterwards `language` is available through page context (for further usage in react-i18next, linguiJS and other i18n libraries). Query for alternates (to be added to html head) via graphql:
+
+```diff
+// src/templates/page.js
+import React from 'react'
+import { graphql } from 'gatsby'
+
+- const Entry = ({ data: { entry } }) => (
++ const Entry = ({ data: { entry }, pageContext }) => (
+  <>
+    <h1>Entry "{entry.title}"</h1>
++   <p>language: <code>{pageContext.language}</code></p>
+    <pre>{JSON.stringify(entry, null, 2)}</pre>
+  </>
+)
+
+export default Entry
+
+export const query = graphql`
+  query Entry($id: String!) {
+    entry: cockpitGenericCollectionEntries(
+      meta: { id: { eq: $id } }
+    ) {
+      title
++     language
++
++     alternates {
++       title
++       language
++
++       fields {
++         slug
++       }
++     }
+    }
+  }
+`
+```
 
 
 ## Development Status #

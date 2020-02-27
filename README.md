@@ -118,7 +118,7 @@ export default Entry
 
 export const query = graphql`
   query Entry($id: String!) {
-    entry: cockpitGenericCollectionArtworks(
+    entry: cockpitGenericCollectionEntries(
       meta: { id: { eq: $id } }
     ) {
       title

@@ -129,6 +129,53 @@ export const query = graphql`
 
 
 ### Generating slugs #
+
+Add custom slugs to Cockpit sourced nodes by hooking into `onCreateNode`:
+
+```js
+// gatsby-node.js
+
+exports.onCreateNode = ({ node, actions }) => {
+  const { createNodeField } = actions
+
+  if (node.internal.type === 'CockpitGenericCollectionEntries') {
+    const value = slugify(node.title)
+    createNodeField({ node, name: 'slug', value })
+  }
+}
+
+// minimal slugify taken from https://gist.github.com/mathewbyrne/1280286
+// for production probably better to use https://www.npmjs.com/package/slugify
+function slugify(text) {
+  return text.toString().toLowerCase().trim()
+    .replace(/\s+/g, '-')         // Replace spaces with -
+    .replace(/&/g, '-and-')       // Replace & with 'and'
+    .replace(/[^\w\-]+/g, '')     // Remove all non-word chars
+    .replace(/\--+/g, '-')        // Replace multiple - with single -
+    .replace(/^-+/, '')           // Trim - from start of text
+    .replace(/-+$/, '')           // Trim - from end of text
+}
+```
+
+The slug field can then be used in page creation:
+
+```diff
+    result.data.allCockpitGenericCollectionEntries.edges.forEach(
+      ({ node }) => {
+-       const { slug, meta: { id } } = node
++       const { fields: { slug }, meta: { id } } = node
+        createPage({
+          path: slug,
+          component,
+          context: {
+            id,
+          },
+        })
+      }
+    )
+```
+
+
 ### Internationalization #
 
 

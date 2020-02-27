@@ -223,7 +223,7 @@ module.exports = {
 
 ```diff
 // gatsby-node.js
-+ const { assign, isObject } = require('lodash')
++ const { isObject, merge } = require('lodash')
 +
 + const PATH_LOCALIZATIONS = {
 +   exceptions: ['/404/', '/404.html', '/dev-404-page/'],
@@ -281,7 +281,7 @@ module.exports = {
 +         ? page.path
 +         : `/${language}${page.path}`
 +
-+       updatedPage = assign({}, page, {
++       updatedPage = merge({}, page, {
 +         path: localePath,
 +         context: { language },
 +       })

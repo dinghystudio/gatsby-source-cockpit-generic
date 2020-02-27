@@ -18,7 +18,8 @@ GatsbyJS source plugin for fetchting collections and singletons from a [Cockpit 
 * Fetching contents
 * Creating pages
 * Generating slugs
-* Internationalization
+* Multilingual setup
+* Serving remote files / documents
 
 
 ### Installation, configuration & defaults #
@@ -197,7 +198,7 @@ The slug field can then be used in page creation:
 ```
 
 
-### Internationalization #
+### Multilingual setup #
 
 If Cockpit is configured for multiple languages, alternates can be created by updating configuration and sourcing like this:
 
@@ -329,6 +330,39 @@ export const query = graphql`
   }
 `
 ```
+
+
+### Serving remote files / documents (that are not images) #
+
+To serve assets that are not of an image mime type that Gatsby image recognizes, you need to configure a separate `gatsby-source-filesystem` before the `gatsby-source-cockpit-generic` and create a placeholder file (e.g. `${__dirname}/gatsby-filesystem-placeholder.txt`) which apparently is needed for the `publicURL` attribute to be available:
+
+```js
+// gatsby-config.js
+module.exports = {
+  siteMetadata: {
+    title: '…',
+  },
+  plugins: [
+    {
+      // We need filesystem source plugin to add publicURL function to File nodes
+      resolve: 'gatsby-source-filesystem',
+      options: {
+        name: 'placeholder',
+        path: `${__dirname}/gatsby-filesystem-placeholder.txt`,
+      },
+    },
+    {
+      resolve: 'gatsby-source-cockpit-generic',
+      options: {
+        '//': '…',
+      },
+    },
+  ],
+}
+```
+
+Then you can query the remote file with a `publicURL` field.
+See [Issue #4993](https://github.com/gatsbyjs/gatsby/issues/4993) for details.
 
 
 ## Development Status #

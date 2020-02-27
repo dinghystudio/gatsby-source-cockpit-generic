@@ -56,6 +56,78 @@ COCKPIT_HOST="https://www.url-of-your-gatsby-site.com" COCKPIT_ACCESS_TOKEN="[ac
 
 
 ### Creating pages #
+
+Create pages based on Cockpit data by hooking into `createPages` in `gatsby-node.js`:
+
+```js
+// gatsby-node.js
+const path = require(`path`)
+
+exports.createPages = ({ graphql, actions }) => {
+  const { createPage } = actions
+
+  const component = path.resolve('src/templates/page.js')
+  const query = `
+  {
+    allCockpitGenericCollectionEntries {
+      edges {
+        node {
+          slug
+        }
+      }
+    }
+  }
+  `
+
+  return graphql(query).then(result => {
+    if (result.errors) {
+      throw result.errors
+    }
+
+    result.data.allCockpitGenericCollectionEntries.edges.forEach(
+      ({ node }) => {
+        const { slug, meta: { id } } = node
+        createPage({
+          path: slug,
+          component,
+          context: {
+            id,
+          },
+        })
+      }
+    )
+  })
+}
+```
+
+The page template should then query for nodes using the id from context:
+
+```js
+// src/templates/page.js
+import React from 'react'
+import { graphql } from 'gatsby'
+
+const Entry = ({ data: { entry } }) => (
+  <>
+    <h1>Entry "{entry.title}"</h1>
+    <pre>{JSON.stringify(entry, null, 2)}</pre>
+  </>
+)
+
+export default Entry
+
+export const query = graphql`
+  query Entry($id: String!) {
+    entry: cockpitGenericCollectionArtworks(
+      meta: { id: { eq: $id } }
+    ) {
+      title
+    }
+  }
+`
+```
+
+
 ### Generating slugs #
 ### Internationalization #
 

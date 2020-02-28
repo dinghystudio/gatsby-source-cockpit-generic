@@ -10,6 +10,7 @@ GatsbyJS source plugin for fetchting collections and singletons from a [Cockpit 
 * Collection relations
 * i18n
 * (naive) Repeater fields
+* Black- / Whitelisting of Cockpit Collections, Singletons, Media Assets
 
 
 ## Usage #
@@ -20,6 +21,7 @@ GatsbyJS source plugin for fetchting collections and singletons from a [Cockpit 
 * Generating slugs
 * Multilingual setup
 * Serving remote files / documents
+* Black- / Whitelisting
 
 
 ### Installation, configuration & defaults #
@@ -363,6 +365,47 @@ module.exports = {
 
 Then you can query the remote file with a `publicURL` field.
 See [Issue #4993](https://github.com/gatsbyjs/gatsby/issues/4993) for details.
+
+
+### Black- / Whitelisting #
+
+To only fetch certain Collections, Singletons or Assets it is possible to configure blacklists, whitelists and filetypes:
+
+```diff
+    {
+      resolve: 'gatsby-source-cockpit-generic',
+      options: {
+        '//': '…',
++       contents: [
++         {
++           type: 'collection',
++           blacklist: ['news'],
++           whitelist: ['entries', 'news', 'tags'],
++         },
++         { type: 'singleton', whitelist: ['contact'], blacklist: [] },
++         {
++           type: 'asset',
++           filetypes: {
++             image: true,
++             video: true,
++             audio: true,
++             archive: true,
++             document: true,
++             code: true,
++           },
++           tags: {
++             whitelist: [],
++             blacklist: [],
++           },
++         },
++       ],
+      },
+    },
+```
+
+If no white- or blacklists are specified, the plugin will fetch a complete list via Cockpit’s API. Blacklists precede whitelists. Entries should be the lowercase names as given per Cockpit’s API at `/api/collections/listCollections` and `/api/singletons/listSingletons`.
+
+*Note* blacklisting a collection, that has relations to other collections will currently break the setup.
 
 
 ## Development Status #

@@ -410,21 +410,17 @@ If no white- or blacklists are specified, the plugin will fetch a complete list 
 
 ## Development Status #
 
-As of February 2019 this plug in is in productive use on at least two public sites. However there are currently no automated tests. Also the current usage is highly specific and contents are heavily controlled.
+This plugin is in production use on at least two public sites. However there are currently no automated tests. Also the current usage is highly specific and contents are heavily controlled.
 
-Please see the source repositories at GitHub and GitLab for issues and current status.
+Please see the source repositories at GitHub for issues and current status.
 Issues and pull requests welcome!
 
 
 ## Todos #
 
-* Test
+* Add tests
 * Add full example
-* Implement node caching and cache invalidation
 * Enhance console output using Gatsby’s `reporter`
-* White- and blacklisting of Collections and Singletons. Could either be
-  * naive: simply ignore a list of blacklisted Collections/Singletons or only fetch whitelisted contents.
-  * smarter: considering relations between Collections
 
 
 ## Reasoning #

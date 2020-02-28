@@ -1,5 +1,5 @@
 
-const { camelCase, upperFirst, toLower, trim } = require('lodash')
+const { camelCase, merge, upperFirst, toLower, trim } = require('lodash')
 const { createRemoteFileNode } = require('gatsby-source-filesystem')
 
 const Cockpit = require('./api')
@@ -34,14 +34,7 @@ const CONFIG_DEFAULTS = {
 
 
 exports.sourceNodes = async (args, options) => {
-  const config = {
-    ...CONFIG_DEFAULTS,
-    ...options,
-    l10n: {
-      ...CONFIG_DEFAULTS.l10n,
-      ...options.l10n,
-    },
-  }
+  const config = merge(CONFIG_DEFAULTS, options);
 
   const { l10n, host, accessToken, uploadPath } = config
   if (!host || !accessToken) throw new Error(
@@ -224,11 +217,10 @@ exports.sourceNodes = async (args, options) => {
 
 
 const listContentType = async (cockpit, type, whitelist=[], blacklist=[]) => {
-  let items = [].concat(whitelist)
-  if (items.length > 0) return items
+  let items = whitelist.map(s => s.toLowerCase())
+  if (items.length === 0) items = await cockpit[camelCase(`list ${type}s`)]()
 
-  items = await cockpit[camelCase(`list ${type}s`)]()
-  items = items.filter(i => !blacklist.includes(i))
+  items = items.filter(i => !blacklist.map(s => s.toLowerCase()).includes(i))
   return items
 }
 

@@ -26,13 +26,20 @@ GatsbyJS source plugin for fetchting collections and singletons from a [Cockpit 
 
 ### Installation, configuration & defaults #
 
-Add `gatsby-source-cockpit-generic` to `gatsby-config.js`:
+Install via npm:
+
+```bash
+#!/bin/bash
+npm install --save @dinghystudio/gatsby-source-cockpit-generic
+```
+
+Add `@dinghystudio/gatsby-source-cockpit-generic` to `gatsby-config.js`:
 
 ```javascript
 module.exports = {
   plugins: [
     {
-      resolve: 'gatsby-source-cockpit-generic',
+      resolve: '@dinghystudio/gatsby-source-cockpit-generic',
       options: {
         host: `${process.env.COCKPIT_HOST}`,
         accessToken: `${process.env.COCKPIT_ACCESS_TOKEN}`,
@@ -209,7 +216,7 @@ If Cockpit is configured for multiple languages, alternates can be created by up
 module.exports = {
   plugins: [
     {
-      resolve: 'gatsby-source-cockpit-generic',
+      resolve: '@dinghystudio/gatsby-source-cockpit-generic',
       options: {
         host: `${process.env.COCKPIT_HOST}`,
         accessToken: `${process.env.COCKPIT_ACCESS_TOKEN}`,
@@ -236,7 +243,7 @@ module.exports = {
 +   const {
 +     options: { l10n },
 +   } = config.plugins.find(
-+     p => isObject(p) && p.resolve === 'gatsby-source-cockpit-generic'
++     p => isObject(p) && p.resolve === '@dinghystudio/gatsby-source-cockpit-generic'
 +   )
 +   return l10n
 + }
@@ -336,7 +343,7 @@ export const query = graphql`
 
 ### Serving remote files / documents (that are not images) #
 
-To serve assets that are not of an image mime type that Gatsby image recognizes, you need to configure a separate `gatsby-source-filesystem` before the `gatsby-source-cockpit-generic` and create a placeholder file (e.g. `${__dirname}/gatsby-filesystem-placeholder.txt`) which apparently is needed for the `publicURL` attribute to be available:
+To serve assets that are not of an image mime type that Gatsby image recognizes, you need to configure a separate `gatsby-source-filesystem` before the `@dinghystudio/gatsby-source-cockpit-generic` and create a placeholder file (e.g. `${__dirname}/gatsby-filesystem-placeholder.txt`) which apparently is needed for the `publicURL` attribute to be available:
 
 ```js
 // gatsby-config.js
@@ -354,7 +361,7 @@ module.exports = {
       },
     },
     {
-      resolve: 'gatsby-source-cockpit-generic',
+      resolve: '@dinghystudio/gatsby-source-cockpit-generic',
       options: {
         '//': '…',
       },
@@ -373,7 +380,7 @@ To only fetch certain Collections, Singletons or Assets it is possible to config
 
 ```diff
     {
-      resolve: 'gatsby-source-cockpit-generic',
+      resolve: '@dinghystudio/gatsby-source-cockpit-generic',
       options: {
         '//': '…',
 +       contents: [

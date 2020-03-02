@@ -217,10 +217,10 @@ exports.sourceNodes = async (args, options) => {
 
 
 const listContentType = async (cockpit, type, whitelist=[], blacklist=[]) => {
-  let items = whitelist.map(s => s.toLowerCase())
+  let items = [].concat(whitelist)
   if (items.length === 0) items = await cockpit[camelCase(`list ${type}s`)]()
 
-  items = items.filter(i => !blacklist.map(s => s.toLowerCase()).includes(i))
+  items = items.filter(i => !blacklist.includes(i))
   return items
 }
 

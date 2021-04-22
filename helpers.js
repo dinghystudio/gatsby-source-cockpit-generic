@@ -134,7 +134,10 @@ const getContentHelpers = (args, config) => {
       spec
     ) => {
       // console.log('------', item)
-      const { field: { type, label } = {}, name } = spec;
+      const {
+        options: { field: { type, label } = {} },
+        name,
+      } = spec;
 
       if (type === "asset") {
         return getValueNode(
